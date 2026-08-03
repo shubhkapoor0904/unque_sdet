@@ -11,6 +11,7 @@ from pages.login_page import LoginPage
 from pages.inventory_page import InventoryPage
 from pages.cart_page import CartPage
 from pages.checkout_page import CheckoutStepOnePage
+from pages.product_detail_page import ProductDetailPage
 
 
 def _login_as(driver, username):
@@ -68,3 +69,69 @@ def test_performance_glitch_user_login_delay_is_flagged(driver):
     # isn't a functional break — but flag anything unreasonable.
     if elapsed > 5:
         pytest.skip(f"BUG-05 observed: abnormal login delay of {elapsed:.2f}s (no loading indicator shown)")
+
+
+# --- BUG-03: cart button state desyncs between grid view and detail view ---
+# Confirmed manually across all 6 products, split into two failure groups.
+GROUP_A = ["Sauce Labs Backpack", "Sauce Labs Bike Light", "Sauce Labs Onesie"]
+GROUP_B = ["Sauce Labs Bolt T-Shirt", "Sauce Labs Fleece Jacket", "Test.allTheThings() T-Shirt (Red)"]
+
+
+@pytest.mark.xfail(reason="BUG-03 (Group A): detail page shows stale 'Add to cart' after adding from the grid")
+@pytest.mark.parametrize("product_name", GROUP_A)
+def test_problem_user_group_a_detail_page_reflects_grid_add(driver, product_name):
+    _login_as(driver, "problem_user")
+    inventory_page = InventoryPage(driver)
+
+    inventory_page.add_item_to_cart_by_name(product_name)
+    assert inventory_page.get_cart_button_text_for_product(product_name) == "Remove", (
+        "Sanity check: grid button should flip to Remove after adding"
+    )
+
+    inventory_page.click_product_title(product_name)
+    detail_page = ProductDetailPage(driver)
+    assert detail_page.get_cart_button_text() == "Remove", (
+        f"Detail page for '{product_name}' still shows 'Add to cart' despite item already being in the cart"
+    )
+
+
+@pytest.mark.xfail(reason="BUG-03 (Group B): grid Add is unresponsive; detail-page Remove doesn't actually remove the item")
+@pytest.mark.parametrize("product_name", GROUP_B)
+def test_problem_user_group_b_add_and_remove_are_broken(driver, product_name):
+    _login_as(driver, "problem_user")
+    inventory_page = InventoryPage(driver)
+
+    # Grid "Add to cart" should be unresponsive for this group.
+    inventory_page.add_item_to_cart_by_name(product_name)
+    grid_button_text = inventory_page.get_cart_button_text_for_product(product_name)
+    assert grid_button_text == "Remove", (
+        f"Expected grid Add to cart for '{product_name}' to work, but button still reads '{grid_button_text}'"
+    )
+
+    # Add via the detail page instead, then try to remove it there.
+    inventory_page.click_product_title(product_name)
+    detail_page = ProductDetailPage(driver)
+    if detail_page.get_cart_button_text() == "Add to cart":
+        detail_page.click_cart_button()
+    detail_page.click_cart_button()  # attempt Remove
+    assert detail_page.get_cart_button_text() == "Add to cart", (
+        f"'{product_name}' Remove button on the detail page did not actually remove the item"
+    )
+
+
+# --- BUG-07: Reset App State doesn't apply until the page is manually refreshed ---
+@pytest.mark.xfail(reason="BUG-07: cart badge/contents don't clear until a manual page refresh after Reset App State")
+def test_reset_app_state_applies_without_manual_refresh(driver):
+    _login_as(driver, "problem_user")
+    inventory_page = InventoryPage(driver)
+    inventory_page.add_item_to_cart_by_name("Sauce Labs Backpack")
+    assert inventory_page.get_cart_count() == 1
+
+    inventory_page.reset_app_state()
+
+    # Intentionally NOT refreshing the page here — this is the exact
+    # condition that exposes the bug. A correct implementation would clear
+    # the badge immediately, without needing a reload.
+    assert inventory_page.get_cart_count() == 0, (
+        "Cart badge still shows the pre-reset count without a manual page refresh"
+    )

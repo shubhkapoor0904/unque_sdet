@@ -71,7 +71,7 @@ Watch the browser instead of running headless: open `tests/conftest.py` and comm
 |---|---|
 | `test_login.py` | Login with valid credentials (`standard_user`); login with `locked_out_user` produces the correct error message; 3 additional negative-path parametrized cases (blank fields, bad password) |
 | `test_e2e_checkout.py` | Full add-to-cart → checkout → order-confirmation happy path, plus a validation check that checkout is correctly blocked when a required field is missing |
-| `test_problem_user_bugs.py` | Automated, repeatable checks for the 3 most testable bugs from `bug_report.md` (broken images, corrupted checkout fields, broken sort) using `@pytest.mark.xfail` so the suite documents *known* failures rather than reporting false red builds; also times `performance_glitch_user`'s login and flags it if abnormally slow |
+| `test_problem_user_bugs.py` | Automated, repeatable checks for 6 of the bugs from `bug_report.md`: broken images (BUG-01), corrupted checkout fields (BUG-02), grid/detail-page cart button desync across Group A and Group B products (BUG-03), broken Z→A sort (BUG-04), and Reset App State not applying without a manual refresh (BUG-07) — all using `@pytest.mark.xfail` so the suite documents *known* failures rather than reporting false red builds; also times `performance_glitch_user`'s login and flags it if abnormally slow (BUG-05) |
 
 ## Notes for reviewers
 

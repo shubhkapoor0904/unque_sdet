@@ -24,6 +24,7 @@ Every bug below marked **Confirmed** was independently reproduced two ways:
 - **User role:** `problem_user`
 - **Module:** Product Catalog (Inventory page)
 - **Automated evidence:** `test_problem_user_product_images_are_distinct` → `XFAIL` (assertion `len(set(srcs)) == len(srcs)` failed — duplicate `src` values found across product image tags)
+- **Visual evidence:** confirmed by screenshot — all 6 inventory tiles (Backpack, Bike Light, Bolt T-Shirt, Fleece Jacket, Onesie, Test.allTheThings T-Shirt) render the identical close-up photo of a dog holding a tennis ball, regardless of the actual product
 - **Steps to Reproduce:**
   1. Log in with `problem_user` / `secret_sauce`
   2. Observe the inventory grid (`/inventory.html`)
@@ -66,10 +67,30 @@ Every bug below marked **Confirmed** was independently reproduced two ways:
 
 ---
 
-### BUG-03: "Add to Cart" button on individual product detail pages for `problem_user` — ⚠️ Unconfirmed
+### BUG-03: Cart button state desyncs between grid view and product detail view for `problem_user` — ✅ Confirmed
 
-- **Status:** Not yet independently verified — this was in the original secondhand list and is **not** covered by the current automated suite. Do not include in your report/video until you've personally reproduced it.
-- **How to check it yourself:** Log in as `problem_user`, click into 2–3 different products' detail pages (click the product *title*, not just view it in the grid), and try "Add to cart" from each detail page. Watch specifically for: does the cart badge number increment, and does the button label change to "Remove"? If both happen correctly every time, this bug does not currently exist — drop it from the report.
+- **Severity:** High
+- **Priority:** P1
+- **User role:** `problem_user`
+- **Module:** Inventory grid vs. Product Detail Page — cart button state
+- **Found by:** Shubh, manual exploratory testing
+- **Actual Result — the 6 products split into two distinct broken groups:**
+
+  **Group A — "Sauce Labs Backpack," "Sauce Labs Bike Light," "Sauce Labs Onesie":**
+  1. Click "Add to cart" from the main inventory grid → button correctly flips to "Remove," cart badge increments (see screenshot: all three show red "Remove" buttons on the grid)
+  2. Click into that same product's detail page → button still reads "Add to cart," even though the item is genuinely in the cart
+  3. Result: the detail page is showing stale/incorrect button state for an item that's actually already in the cart
+
+  **Group B — "Sauce Labs Bolt T-Shirt," "Sauce Labs Fleece Jacket," "Test.allTheThings() T-Shirt (Red)":**
+  1. Click "Add to cart" from the main inventory grid → **no response** — button stays "Add to cart," badge does not increment
+  2. Click into that same product's detail page → "Add to cart" here *does* work, button flips to "Remove"
+  3. Click "Remove" on the detail page → **button stays stuck on "Remove"**, item is not actually taken out of the cart
+
+- **Expected Result:** Cart state (badge count, button label) should be identical and consistent whether viewed from the grid or a product's own detail page, and Remove should function everywhere Add does.
+- **Impact:** Users can end up in a state where they believe an item isn't in their cart (grid) when it actually is (Group A), or can add an item via the detail page but then have no way to remove it again (Group B) — both are direct paths to an incorrect order at checkout.
+- **How to spot it by hand:** Add each of the 6 products one at a time from the grid, noting which ones flip to "Remove" immediately. Then, for every product, click into its detail page and compare the button state there against the grid. The mismatch only shows up when you deliberately check *both* views for the *same* product — checking either view alone looks totally normal.
+
+---
 
 ---
 
@@ -123,15 +144,34 @@ Every bug below marked **Confirmed** was independently reproduced two ways:
 
 ---
 
+### BUG-07: "Reset App State" does not take effect until the page is manually refreshed — ✅ Confirmed
+
+- **Severity:** Medium
+- **Priority:** P2
+- **User role:** Reproduced on `problem_user`; worth spot-checking on `standard_user` too
+- **Module:** Hamburger menu — Reset App State
+- **Found by:** Shubh, manual exploratory testing
+- **Steps to Reproduce:**
+  1. Add one or more items to the cart
+  2. Open the hamburger menu (☰, top left) → click "Reset App State"
+  3. **Without refreshing the page**, observe the cart badge and cart contents
+- **Expected Result:** "Reset App State" is an explicit, immediate action — the cart badge should clear and the cart should empty right away, with no refresh required.
+- **Actual Result:** The cart badge and cart contents continue showing the pre-reset state until the page is manually refreshed (F5/reload) — only then does the reset actually reflect on screen.
+- **Impact:** Since the menu item implies an instant reset, a user (or a QA tester) who clicks it and immediately checks the result will conclude the feature is completely broken — when it has, misleadingly, worked internally but not visually. This can also mask other bugs during testing, since a "reset" that a tester assumes worked may not have.
+- **Non-obvious because:** Most people reflexively refresh the page right after clicking a reset/state-changing action out of habit, which immediately masks the bug — you have to deliberately hold off refreshing to see it.
+
+---
+
 ## Summary Table
 
 | ID | Title | Severity | Role | Status |
 |---|---|---|---|---|
 | BUG-01 | Duplicated/broken product images | High | problem_user | ✅ Confirmed |
 | BUG-02 | Last Name field state corruption | Critical | problem_user | ✅ Confirmed |
-| BUG-03 | Add to Cart on detail page | High | problem_user | ⚠️ Unconfirmed — verify before reporting |
+| BUG-03 | Cart button state desyncs between grid and detail view | High | problem_user | ✅ Confirmed |
 | BUG-04 | Sort dropdown doesn't reorder products | Medium | problem_user | ✅ Confirmed |
 | BUG-05 | Abnormal login delay (5.84s), no indicator | Medium | performance_glitch_user | ✅ Confirmed |
-| BUG-06 | Cart badge count desync | Low–Medium | standard_user / problem_user | ⚠️ Unconfirmed — verify before reporting |
+| BUG-06 | Cart badge count desync | Low–Medium | standard_user / problem_user | ⚠️ Unconfirmed — verify before reporting, or drop |
+| BUG-07 | Reset App State doesn't apply until manual refresh | Medium | problem_user | ✅ Confirmed |
 
-**For the video/final submission:** lead with BUG-01, 02, 04, 05 — these have both automated proof and a precise manual repro path. Only include BUG-03 or BUG-06 if you personally reproduce them using the steps above; otherwise, replace them with anything new you find during your own exploratory pass (e.g., try rapid double-clicking "Add to cart," resizing the window mid-checkout, or using the browser back button after logout).
+**For the video/final submission:** you now have 6 fully confirmed bugs (BUG-01, 02, 03, 04, 05, 07) — comfortably past the "at least 5" requirement, all personally verified by you plus 4 backed by automated assertions. Drop BUG-06 unless you specifically re-check and confirm it; you don't need it anymore. BUG-03 and BUG-07 are your strongest material for Video 2 — they're specific, self-found (not recycled from old write-ups), and genuinely non-obvious.
